@@ -207,9 +207,21 @@ public final class CaffeineConfig {
     private boolean applyDependencies() {
         boolean changed = false;
         for (Option optionWithDependency : this.optionsWithDependencies) {
-            changed |= optionWithDependency.disableIfDependenciesNotMet(logger);
+            changed |= optionWithDependency.disableIfDependenciesNotMet(logger, this);
         }
         return changed;
+    }
+
+    public Option getParent(Option option) {
+        String optionName = option.getName();
+        int split;
+
+        if ((split = optionName.lastIndexOf('.')) != -1) {
+            String key = optionName.substring(0, split);
+            return this.options.get(key);
+
+        }
+        return null;
     }
 
     private static void writeDefaultConfig(Path file, String modName, String infoUrl) throws IOException {
