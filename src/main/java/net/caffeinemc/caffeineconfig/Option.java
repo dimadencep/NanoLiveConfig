@@ -46,6 +46,10 @@ public final class Option {
         return this.enabled;
     }
 
+    public boolean isEnabledRecursive(CaffeineConfig config) {
+        return this.enabled && (config.getParent(this) == null || config.getParent(this).isEnabledRecursive(config));
+    }
+
     /**
      * @return {@code true} if this option is overridden, {@code false} otherwise
      */
@@ -100,12 +104,12 @@ public final class Option {
         this.dependencies.put(dependencyOption, requiredValue);
     }
 
-    boolean disableIfDependenciesNotMet(Logger logger) {
+    boolean disableIfDependenciesNotMet(Logger logger, CaffeineConfig config) {
         if (this.dependencies != null && this.isEnabled()) {
             for (Object2BooleanMap.Entry<Option> dependency : this.dependencies.object2BooleanEntrySet()) {
                 Option option = dependency.getKey();
                 boolean requiredValue = dependency.getBooleanValue();
-                if (option.isEnabled() != requiredValue) {
+                if (option.isEnabledRecursive(config) != requiredValue) {
                     this.enabled = false;
                     logger.warn("Option '{}' requires '{}={}' but found '{}'. Setting '{}={}'.", this.name, option.name, requiredValue, option.isEnabled(), this.name, this.enabled);
                     return true;
