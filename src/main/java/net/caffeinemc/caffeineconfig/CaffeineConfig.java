@@ -90,9 +90,16 @@ public final class CaffeineConfig {
      * @see Builder#addMixinOption(String, boolean)
      */
     private void addMixinOption(String mixin, boolean enabled) {
+        this.addMixinOption(mixin, enabled, true);
+    }
+
+    /**
+     * @see Builder#addMixinOption(String, boolean, boolean)
+     */
+    public void addMixinOption(String mixin, boolean enabled, boolean overrideable) {
         String name = getMixinOptionName(mixin);
 
-        if (this.options.putIfAbsent(name, new Option(name, enabled, false)) != null) {
+        if (this.options.putIfAbsent(name, new Option(name, enabled, false, overrideable)) != null) {
             throw new IllegalStateException("Mixin option already defined: " + mixin);
         }
     }
@@ -106,6 +113,11 @@ public final class CaffeineConfig {
 
             if (option == null) {
                 logger.warn("No configuration key exists with name '{}', ignoring", key);
+                continue;
+            }
+
+            if (!option.isOverrideable()) {
+                logger.warn("User attempted to override option '{}' that is not overrideable, ignoring", key);
                 continue;
             }
 
@@ -153,6 +165,11 @@ public final class CaffeineConfig {
 
         if (value.getType() != CvType.BOOLEAN) {
             logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", meta.getId(), name);
+            return;
+        }
+
+        if (!option.isOverrideable()) {
+            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable, ignoring", meta.getId(), name);
             return;
         }
 
@@ -281,10 +298,23 @@ public final class CaffeineConfig {
          *
          * @param mixin   The name of the mixin package which will be controlled by this option
          * @param enabled {@code true} if the option will be enabled by default, {@code false} otherwise
-         * @throws IllegalStateException If a option with that name already exists
+         * @throws IllegalStateException If an option with that name already exists
          */
         public Builder addMixinOption(String mixin, boolean enabled) {
             CaffeineConfig.this.addMixinOption(mixin, enabled);
+            return this;
+        }
+
+        /**
+         * <p>Defines a Mixin option which can be configured by users and other mods.</p>
+         *
+         * @param mixin   The name of the mixin package which will be controlled by this option
+         * @param enabled {@code true} if the option will be enabled by default, {@code false} otherwise
+         * @param overrideable {@code true} if an option is user/mod overrideable, {@code false} otherwise
+         * @throws IllegalStateException If an option with that name already exists
+         */
+        public Builder addMixinOption(String mixin, boolean enabled, boolean overrideable) {
+            CaffeineConfig.this.addMixinOption(mixin, enabled, overrideable);
             return this;
         }
 

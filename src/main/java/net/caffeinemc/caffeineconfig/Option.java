@@ -25,11 +25,13 @@ public final class Option {
     private Set<String> modDefined = null;
     private boolean enabled;
     private boolean userDefined;
+    private boolean overrideable;
 
-    Option(String name, boolean enabled, boolean userDefined) {
+    Option(String name, boolean enabled, boolean userDefined, boolean overrideable) {
         this.name = name;
         this.enabled = enabled;
         this.userDefined = userDefined;
+        this.overrideable = overrideable;
     }
 
     /**
@@ -62,6 +64,13 @@ public final class Option {
      */
     public boolean isUserDefined() {
         return this.userDefined;
+    }
+
+    /**
+     * @return {@code true} if this option is overrideable, {@code false} otherwise
+     */
+    public boolean isOverrideable() {
+        return this.overrideable;
     }
 
     /**
