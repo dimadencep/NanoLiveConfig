@@ -9,7 +9,7 @@ public class ExampleModMixinConfigPlugin extends AbstractCaffeineConfigMixinPlug
     @Override
     protected CaffeineConfig createConfig() {
         return CaffeineConfig.builder("ExampleMod")
-                .addMixinOption("ai", true)
+                .addMixinOption("ai", true, false)
                 .addMixinOption("ai.brain", true)
                 .addMixinOption("ai.goal", true)
                 .addMixinOption("block.hopper", true)
