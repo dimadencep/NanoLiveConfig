@@ -1,16 +1,18 @@
 package net.caffeinemc.caffeineconfig;
 
+import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.CustomValue.CvType;
 import net.fabricmc.loader.api.metadata.ModMetadata;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -20,7 +22,7 @@ import java.util.Set;
 
 /**
  * <p>A mixin configuration object. Holds the {@link Option options} defined and handles overrides.</p>
- * 
+ *
  * @see CaffeineConfig.Builder
  */
 @SuppressWarnings("CanBeFinal")
@@ -36,14 +38,13 @@ public final class CaffeineConfig {
 
     /**
      * <p>Creates and returns a {@link CaffeineConfig.Builder} that can be used to create a {@link CaffeineConfig} object.</p>
-     * 
+     *
      * <p>Unless the methods in the builder are later called, the given {@code modName} will be used to get the logger and the JSON key.</p>
      * <p>The default logger is the one gotten from {@link LogManager#getLogger(String)} with the name {@code modName+" Config"}, and the default
      * JSON key is {@code lowercase(modName):options}. For example, if {@code modName} is {@code ExampleMod}, logger will be {@code ExampleModConfig}
      * and JSON key will be {@code examplemod:options} </p>
-     * 
+     *
      * @param modName The name of the mod. Must not be {@code null}
-     * 
      * @return A new {@link CaffeineConfig.Builder} instance
      */
     public static CaffeineConfig.Builder builder(String modName) {
@@ -51,6 +52,32 @@ public final class CaffeineConfig {
         config.logger = LogManager.getLogger(modName + " Config");
         String jsonKey = modName.toLowerCase() + ":options";
         return config.new Builder().withSettingsKey(jsonKey);
+    }
+
+    private static void writeDefaultConfig(Path file, String modName, String infoUrl) throws IOException {
+        Path dir = file.getParent();
+
+        if (!Files.exists(dir)) {
+            Files.createDirectories(dir);
+        } else if (!Files.isDirectory(dir)) {
+            throw new IOException("The parent file is not a directory");
+        }
+
+        try (BufferedWriter writer = Files.newBufferedWriter(file)) {
+            writer.write(String.format("# This is the configuration file for %s.\n", modName));
+            writer.write("# This file exists for debugging purposes and should not be configured otherwise.\n");
+            writer.write("#\n");
+            if (infoUrl != null) {
+                writer.write("# You can find information on editing this file and all the available options here:\n");
+                writer.write("# " + infoUrl + "\n");
+                writer.write("#\n");
+            }
+            writer.write("# By default, this file will be empty except for this notice.\n");
+        }
+    }
+
+    private static String getMixinOptionName(String name) {
+        return "mixin." + name;
     }
 
     /**
@@ -64,8 +91,8 @@ public final class CaffeineConfig {
      * @return The logger from this {@link CaffeineConfig}
      */
     public Logger getLogger() {
-		return logger;
-	}
+        return logger;
+    }
 
     /**
      * @see Builder#addOptionDependency(String, String, boolean)
@@ -133,6 +160,41 @@ public final class CaffeineConfig {
             }
 
             option.setEnabled(enabled, true);
+        }
+    }
+
+    // Apply override-ability to children
+    private void applyOverrideableChecks() {
+        for (Option parentOption : this.options.values()) {
+            for (Option childOption : this.options.values()) {
+                if (childOption.getName().startsWith(parentOption.getName() + '.') && childOption != parentOption) {
+                    if (!parentOption.isOverrideable() && childOption.isOverrideable()) {
+                        logger.warn("Mixin option '{}' cannot be set as overrideable because its parent option '{}' is not overrideable. The mixin option will be treated as not overrideable.", childOption.getName(), parentOption.getName());
+                        childOption.setOverrideable(false);
+                    }
+                }
+            }
+        }
+    }
+
+    private void applyChildOptionsStateChecks() {
+        for (Option parentOption : this.options.values()) {
+            for (Option childOption : this.options.values()) {
+                if (childOption.getName().startsWith(parentOption.getName() + '.') && childOption != parentOption) {
+                    if (childOption.isOverrideable() && (parentOption.isUserDefined() || parentOption.isModDefined())) {
+                        childOption.setEnabled(parentOption.isEnabled(), parentOption.isUserDefined());
+                        if (parentOption.isModDefined()) {
+                            parentOption.getDefiningMods().forEach(mod -> childOption.addModOverride(parentOption.isEnabled(), mod));
+                        }
+                    } else {
+                        if (parentOption.isUserDefined()) {
+                            logger.warn("User attempted to override option '{}' that is not overrideable by overriding '{}', ignoring", childOption.getName(), parentOption.getName());
+                        } else if (parentOption.isModDefined()) {
+                            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable by overriding '{}', ignoring", parentOption.getDefiningMods(), childOption.getName(), parentOption.getName());
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -241,32 +303,6 @@ public final class CaffeineConfig {
         return null;
     }
 
-    private static void writeDefaultConfig(Path file, String modName, String infoUrl) throws IOException {
-        Path dir = file.getParent();
-
-        if (!Files.exists(dir)) {
-            Files.createDirectories(dir);
-        } else if (!Files.isDirectory(dir)) {
-            throw new IOException("The parent file is not a directory");
-        }
-
-        try (BufferedWriter writer = Files.newBufferedWriter(file)) {
-            writer.write(String.format("# This is the configuration file for %s.\n", modName));
-            writer.write("# This file exists for debugging purposes and should not be configured otherwise.\n");
-            writer.write("#\n");
-            if (infoUrl != null) {
-                writer.write("# You can find information on editing this file and all the available options here:\n");
-                writer.write("# " + infoUrl + "\n");
-                writer.write("#\n");
-            }
-            writer.write("# By default, this file will be empty except for this notice.\n");
-        }
-    }
-
-    private static String getMixinOptionName(String name) {
-        return "mixin." + name;
-    }
-
     public int getOptionCount() {
         return this.options.size();
     }
@@ -278,12 +314,16 @@ public final class CaffeineConfig {
                 .count();
     }
 
+    public Map<String, Option> getOptions() {
+        return ImmutableMap.copyOf(this.options);
+    }
+
     /**
      * <p>A builder for {@link CaffeineConfig} instances.</p>
-     * 
-     * <p>Allows adding mixin options and creating depencencies between them, as well as 
+     *
+     * <p>Allows adding mixin options and creating depencencies between them, as well as
      * configuring various properties from this config.</p>
-     * 
+     *
      * @see CaffeineConfig#builder(String)
      */
     public final class Builder {
@@ -291,7 +331,8 @@ public final class CaffeineConfig {
         private String infoUrl;
         private String jsonKey;
 
-        private Builder() {}
+        private Builder() {
+        }
 
         /**
          * <p>Defines a Mixin option which can be configured by users and other mods.</p>
@@ -308,8 +349,8 @@ public final class CaffeineConfig {
         /**
          * <p>Defines a Mixin option which can be configured by users and other mods.</p>
          *
-         * @param mixin   The name of the mixin package which will be controlled by this option
-         * @param enabled {@code true} if the option will be enabled by default, {@code false} otherwise
+         * @param mixin        The name of the mixin package which will be controlled by this option
+         * @param enabled      {@code true} if the option will be enabled by default, {@code false} otherwise
          * @param overrideable {@code true} if an option is user/mod overrideable, {@code false} otherwise
          * @throws IllegalStateException If an option with that name already exists
          */
@@ -334,6 +375,7 @@ public final class CaffeineConfig {
 
         /**
          * <p>Sets the logger the built {@link CaffeineConfig} will use, instead of one derived from the mod name</p>
+         *
          * @param logger The {@link Logger} to use. Can't be {@code null}
          */
         public Builder withLogger(Logger logger) {
@@ -343,6 +385,7 @@ public final class CaffeineConfig {
 
         /**
          * <p>Sets the key name to search in other mod's custom values in order to find overrides.</p>
+         *
          * @param key The key to search for
          */
         public Builder withSettingsKey(String key) {
@@ -352,8 +395,9 @@ public final class CaffeineConfig {
 
         /**
          * <p>Sets the url to a resource with more information about the options to write in the config file header.</p>
-         * 
+         *
          * <p>If it's {@code null} or not set, the paragraph about help on editing the file will be skipped</p>
+         *
          * @param url A {@link String} representing the url, or {@code null} to disable the paragraph
          */
         public Builder withInfoUrl(String url) {
@@ -363,20 +407,22 @@ public final class CaffeineConfig {
 
         /**
          * <p>Builds a {@link CaffeineConfig} with the specified options, and populates the overrides for them.</p>
-         * 
-         * <p>This method will create a file in the given {@link Path} (and its parent directories if necessary) or 
+         *
+         * <p>This method will create a file in the given {@link Path} (and its parent directories if necessary) or
          * read from it if it already exists.</p>
-         * 
+         *
          * <p>It will also check for overrides in all loaded mods.</p>
-         * 
+         *
          * <p>This method can only be called once per builder object</p>
-         * 
+         *
          * @param path The {@link Path} to the settings file
          */
         public CaffeineConfig build(Path path) {
             if (alreadyBuilt) {
                 throw new IllegalStateException("Cannot build a CaffeineConfig twice from the same builder");
             }
+
+            applyOverrideableChecks();
 
             if (Files.exists(path)) {
                 Properties props = new Properties();
@@ -400,7 +446,9 @@ public final class CaffeineConfig {
 
             // Check dependencies several times, because one iteration may disable a option required by another option
             // This terminates because each additional iteration will disable one or more options, and there is only a finite number of rules
-            while (applyDependencies());
+            while (applyDependencies()) ;
+
+            applyChildOptionsStateChecks();
 
             this.alreadyBuilt = true;
 

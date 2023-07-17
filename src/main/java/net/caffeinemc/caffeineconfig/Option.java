@@ -86,6 +86,10 @@ public final class Option {
         return this.modDefined != null ? Collections.unmodifiableCollection(this.modDefined) : Collections.emptyList();
     }
 
+    void setOverrideable(boolean overrideable) {
+        this.overrideable = overrideable;
+    }
+
     void setEnabled(boolean enabled, boolean userDefined) {
         this.enabled = enabled;
         this.userDefined = userDefined;
