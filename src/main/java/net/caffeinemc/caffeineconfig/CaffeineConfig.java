@@ -1,22 +1,24 @@
 package net.caffeinemc.caffeineconfig;
 
+import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.CustomValue.CvType;
 import net.fabricmc.loader.api.metadata.ModMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>A mixin configuration object. Holds the {@link Option options} defined and handles overrides.</p>
@@ -38,7 +40,7 @@ public final class CaffeineConfig {
      * <p>Creates and returns a {@link CaffeineConfig.Builder} that can be used to create a {@link CaffeineConfig} object.</p>
      * 
      * <p>Unless the methods in the builder are later called, the given {@code modName} will be used to get the logger and the JSON key.</p>
-     * <p>The default logger is the one gotten from {@link LogManager#getLogger(String)} with the name {@code modName+" Config"}, and the default
+     * <p>The default logger is the one gotten from {@link LoggerFactory#getLogger(String)} with the name {@code modName+" Config"}, and the default
      * JSON key is {@code lowercase(modName):options}. For example, if {@code modName} is {@code ExampleMod}, logger will be {@code ExampleModConfig}
      * and JSON key will be {@code examplemod:options} </p>
      * 
@@ -133,6 +135,41 @@ public final class CaffeineConfig {
             }
 
             option.setEnabled(enabled, true);
+        }
+    }
+
+    // Apply override-ability to children
+    private void applyOverrideableChecks() {
+        for (Option parentOption : this.options.values()) {
+            for (Option childOption : this.options.values()) {
+                if (childOption.getName().startsWith(parentOption.getName() + '.') && childOption != parentOption) {
+                    if (!parentOption.isOverrideable() && childOption.isOverrideable()) {
+                        logger.warn("Mixin option '{}' cannot be set as overrideable because its parent option '{}' is not overrideable. The mixin option will be treated as not overrideable.", childOption.getName(), parentOption.getName());
+                        childOption.setOverrideable(false);
+                    }
+                }
+            }
+        }
+    }
+
+    private void applyChildOptionsStateChecks() {
+        for (Option parentOption : this.options.values()) {
+            for (Option childOption : this.options.values()) {
+                if (childOption.getName().startsWith(parentOption.getName() + '.') && childOption != parentOption) {
+                    if (childOption.isOverrideable() && (parentOption.isUserDefined() || parentOption.isModDefined())) {
+                        childOption.setEnabled(parentOption.isEnabled(), parentOption.isUserDefined());
+                        if (parentOption.isModDefined()) {
+                            parentOption.getDefiningMods().forEach(mod -> childOption.addModOverride(parentOption.isEnabled(), mod));
+                        }
+                    } else {
+                        if (parentOption.isUserDefined()) {
+                            logger.warn("User attempted to override option '{}' that is not overrideable by overriding '{}', ignoring", childOption.getName(), parentOption.getName());
+                        } else if (parentOption.isModDefined()) {
+                            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable by overriding '{}', ignoring", parentOption.getDefiningMods(), childOption.getName(), parentOption.getName());
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -278,6 +315,10 @@ public final class CaffeineConfig {
                 .count();
     }
 
+    public Map<String, Option> getOptions() {
+        return ImmutableMap.copyOf(this.options);
+    }
+
     /**
      * <p>A builder for {@link CaffeineConfig} instances.</p>
      * 
@@ -378,6 +419,8 @@ public final class CaffeineConfig {
                 throw new IllegalStateException("Cannot build a CaffeineConfig twice from the same builder");
             }
 
+            applyOverrideableChecks();
+
             if (Files.exists(path)) {
                 Properties props = new Properties();
 
@@ -401,6 +444,8 @@ public final class CaffeineConfig {
             // Check dependencies several times, because one iteration may disable a option required by another option
             // This terminates because each additional iteration will disable one or more options, and there is only a finite number of rules
             while (applyDependencies());
+
+            applyChildOptionsStateChecks();
 
             this.alreadyBuilt = true;
 
