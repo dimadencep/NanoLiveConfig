@@ -2,11 +2,7 @@ package net.caffeinemc.caffeineconfig;
 
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
-import net.fabricmc.loader.api.metadata.CustomValue;
-import net.fabricmc.loader.api.metadata.CustomValue.CvType;
-import net.fabricmc.loader.api.metadata.ModMetadata;
+import net.minecraftforge.fml.loading.LoadingModList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,43 +170,36 @@ public final class CaffeineConfig {
     }
 
     private void applyModOverrides(String jsonKey) {
-        for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
-            ModMetadata meta = container.getMetadata();
-
-            if (meta.containsCustomValue(jsonKey)) {
-                CustomValue overrides = meta.getCustomValue(jsonKey);
-
-                if (overrides.getType() != CvType.OBJECT) {
-                    logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getId(), modName);
-                    continue;
+        for (var meta : LoadingModList.get().getMods()) {
+            meta.getConfigElement(jsonKey).ifPresent(overridesObj -> {
+                if (overridesObj instanceof Map overrides && overrides.keySet().stream().allMatch(key -> key instanceof String)) {
+                    overrides.forEach((key, value) -> {
+                        this.applyModOverride(meta.getModId(), (String)key, value);
+                    });
+                } else {
+                    logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getModId(), modName);
                 }
-
-                for (Map.Entry<String, CustomValue> entry : overrides.getAsObject()) {
-                    this.applyModOverride(meta, entry.getKey(), entry.getValue());
-                }
-            }
+            });
         }
     }
 
-    private void applyModOverride(ModMetadata meta, String name, CustomValue value) {
+    private void applyModOverride(String modid, String name, Object value) {
         Option option = this.options.get(name);
 
         if (option == null) {
-            logger.warn("Mod '{}' attempted to override option '{}', which doesn't exist, ignoring", meta.getId(), name);
+            logger.warn("Mod '{}' attempted to override option '{}', which doesn't exist, ignoring", modid, name);
             return;
         }
 
-        if (value.getType() != CvType.BOOLEAN) {
-            logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", meta.getId(), name);
+        if (!(value instanceof Boolean enabled)) {
+            logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", modid, name);
             return;
         }
 
         if (!option.isOverrideable()) {
-            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable, ignoring", meta.getId(), name);
+            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable, ignoring", modid, name);
             return;
         }
-
-        boolean enabled = value.getAsBoolean();
 
         // disabling the option takes precedence over enabling
         if (!enabled && option.isEnabled()) {
@@ -218,7 +207,7 @@ public final class CaffeineConfig {
         }
 
         if (!enabled || option.isEnabled() || option.getDefiningMods().isEmpty()) {
-            option.addModOverride(enabled, meta.getId());
+            option.addModOverride(enabled, modid);
         }
     }
 
