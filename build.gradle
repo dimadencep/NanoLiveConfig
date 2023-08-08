@@ -21,10 +21,6 @@ dependencies {
 	forge "net.neoforged:forge:${project.loader_version}"
 }
 
-loom {
-    runtimeOnlyLog4j = true
-}
-
 processResources {
 	inputs.property "version", project.version
 
