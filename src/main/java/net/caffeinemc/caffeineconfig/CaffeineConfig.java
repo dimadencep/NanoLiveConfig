@@ -1,6 +1,5 @@
 package net.caffeinemc.caffeineconfig;
 
-import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraftforge.fml.loading.LoadingModList;
 import org.apache.logging.log4j.Logger;
@@ -305,7 +304,11 @@ public final class CaffeineConfig {
     }
 
     public Map<String, Option> getOptions() {
-        return ImmutableMap.copyOf(this.options);
+        return this.options;
+    }
+
+    public Option getOption(String name) {
+        return this.options.get(name);
     }
 
     /**

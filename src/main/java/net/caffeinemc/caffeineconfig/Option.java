@@ -87,16 +87,16 @@ public final class Option {
         return this.modDefined != null ? Collections.unmodifiableCollection(this.modDefined) : Collections.emptyList();
     }
 
-    void setOverrideable(boolean overrideable) {
+    public void setOverrideable(boolean overrideable) {
         this.overrideable = overrideable;
     }
 
-    void setEnabled(boolean enabled, boolean userDefined) {
+    public void setEnabled(boolean enabled, boolean userDefined) {
         this.enabled = enabled;
         this.userDefined = userDefined;
     }
 
-    void addModOverride(boolean enabled, String modId) {
+    public void addModOverride(boolean enabled, String modId) {
         this.enabled = enabled;
 
         if (this.modDefined == null) {
@@ -106,18 +106,18 @@ public final class Option {
         this.modDefined.add(modId);
     }
 
-    void clearModsDefiningValue() {
+    public void clearModsDefiningValue() {
         this.modDefined = null;
     }
 
-    void addDependency(Option dependencyOption, boolean requiredValue) {
+    public void addDependency(Option dependencyOption, boolean requiredValue) {
         if (this.dependencies == null) {
             this.dependencies = new Object2BooleanLinkedOpenHashMap<>(1);
         }
         this.dependencies.put(dependencyOption, requiredValue);
     }
 
-    boolean disableIfDependenciesNotMet(Logger logger, CaffeineConfig config) {
+    public boolean disableIfDependenciesNotMet(Logger logger, CaffeineConfig config) {
         if (this.dependencies != null && this.isEnabled()) {
             for (Object2BooleanMap.Entry<Option> dependency : this.dependencies.object2BooleanEntrySet()) {
                 Option option = dependency.getKey();
