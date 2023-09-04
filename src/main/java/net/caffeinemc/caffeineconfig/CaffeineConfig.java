@@ -101,6 +101,33 @@ public final class CaffeineConfig {
         }
     }
 
+    /**
+     * @see Builder#addRuleDependency(String, String, boolean)
+     */
+    private void addRuleDependency(String rule, String dependency, boolean requiredValue) {
+        Option option = this.options.get(rule);
+        if (option == null) {
+            logger.error("Option {} for dependency '{} depends on {}={}' not found. Skipping.", rule, rule, dependency, requiredValue);
+            return;
+        }
+        Option dependencyOption = this.options.get(dependency);
+        if (dependencyOption == null) {
+            logger.error("Option {} for dependency '{} depends on {}={}' not found. Skipping.", dependency, rule, dependency, requiredValue);
+            return;
+        }
+        option.addDependency(dependencyOption, requiredValue);
+        this.optionsWithDependencies.add(option);
+    }
+
+    /**
+     * @see Builder#addMixinRule(String, boolean)
+     */
+    private void addMixinRule(String mixin, boolean enabled) {
+        if (this.options.putIfAbsent(mixin, new Option(mixin, enabled, false, true)) != null) {
+            throw new IllegalStateException("Mixin rule already defined: " + mixin);
+        }
+    }
+
     private void readProperties(Properties props) {
         for (Map.Entry<Object, Object> entry : props.entrySet()) {
             String key = (String) entry.getKey();
@@ -362,6 +389,31 @@ public final class CaffeineConfig {
          */
         public Builder addOptionDependency(String option, String dependency, boolean requiredValue) {
             CaffeineConfig.this.addOptionDependency(option, dependency, requiredValue);
+            return this;
+        }
+
+        /**
+         * Defines a dependency between two registered mixin rules. If a dependency is not satisfied, the mixin will
+         * be disabled.
+         *
+         * @param rule          the mixin rule that requires another rule to be set to a given value
+         * @param dependency    the mixin rule the given rule depends on
+         * @param requiredValue the required value of the dependency
+         */
+        public Builder addRuleDependency(String rule, String dependency, boolean requiredValue) {
+            CaffeineConfig.this.addRuleDependency(rule, dependency, requiredValue);
+            return this;
+        }
+
+        /**
+         * Defines a Mixin rule which can be configured by users and other mods.
+         *
+         * @param mixin   The name of the mixin package which will be controlled by this rule
+         * @param enabled True if the rule will be enabled by default, otherwise false
+         * @throws IllegalStateException If a rule with that name already exists
+         */
+        public Builder addMixinRule(String mixin, boolean enabled) {
+            CaffeineConfig.this.addMixinRule(mixin, enabled);
             return this;
         }
 
