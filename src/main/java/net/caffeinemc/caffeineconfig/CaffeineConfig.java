@@ -1,6 +1,10 @@
 package net.caffeinemc.caffeineconfig;
 
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.fabricmc.loader.api.metadata.CustomValue;
+import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.minecraftforge.fml.loading.LoadingModList;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
@@ -195,12 +199,20 @@ public final class CaffeineConfig {
         }
     }
 
+    private static final boolean fabricApiLoaded = LoadingModList.get().getModFileById("fabric_api_base") != null;
+
     private void applyModOverrides(String jsonKey) {
+        forge$applyModOverrides(jsonKey);
+        if(fabricApiLoaded)
+            fabric$applyModOverrides(jsonKey);
+    }
+
+    private void forge$applyModOverrides(String jsonKey) {
         for (var meta : LoadingModList.get().getMods()) {
             meta.getConfigElement(jsonKey).ifPresent(overridesObj -> {
                 if (overridesObj instanceof Map overrides && overrides.keySet().stream().allMatch(key -> key instanceof String)) {
                     overrides.forEach((key, value) -> {
-                        this.applyModOverride(meta.getModId(), (String)key, value);
+                        this.forge$applyModOverride(meta.getModId(), (String)key, value);
                     });
                 } else {
                     logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getModId(), modName);
@@ -209,7 +221,7 @@ public final class CaffeineConfig {
         }
     }
 
-    private void applyModOverride(String modid, String name, Object value) {
+    private void forge$applyModOverride(String modid, String name, Object value) {
         Option option = this.options.get(name);
 
         if (option == null) {
@@ -234,6 +246,48 @@ public final class CaffeineConfig {
 
         if (!enabled || option.isEnabled() || option.getDefiningMods().isEmpty()) {
             option.addModOverride(enabled, modid);
+        }
+    }
+
+    private void fabric$applyModOverrides(String jsonKey) {
+        for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
+            ModMetadata meta = container.getMetadata();
+
+            if (meta.containsCustomValue(jsonKey)) {
+                CustomValue overrides = meta.getCustomValue(jsonKey);
+
+                if (overrides.getType() != CustomValue.CvType.OBJECT) {
+                    logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getId(), modName);
+                    continue;
+                }
+
+                for (Map.Entry<String, CustomValue> entry : overrides.getAsObject()) {
+                    var name = entry.getKey();
+                    var value = entry.getValue();
+                    Option option = this.options.get(name);
+
+                    if (option == null) {
+                        logger.warn("Mod '{}' attempted to override option '{}', which doesn't exist, ignoring", meta.getId(), name);
+                        return;
+                    }
+
+                    if (value.getType() != CustomValue.CvType.BOOLEAN) {
+                        logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", meta.getId(), name);
+                        return;
+                    }
+
+                    boolean enabled = value.getAsBoolean();
+
+                    // disabling the option takes precedence over enabling
+                    if (!enabled && option.isEnabled()) {
+                        option.clearModsDefiningValue();
+                    }
+
+                    if (!enabled || option.isEnabled() || option.getDefiningMods().isEmpty()) {
+                        option.addModOverride(enabled, meta.getId());
+                    }
+                }
+            }
         }
     }
 
