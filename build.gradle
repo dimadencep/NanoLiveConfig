@@ -12,6 +12,9 @@ group = project.maven_group
 
 repositories {
 	maven { url "https://maven.neoforged.net/releases" }
+	maven {
+		url "https://maven.su5ed.dev/releases"
+	}
 }
 
 dependencies {
@@ -19,6 +22,8 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
 	forge "net.neoforged:forge:${project.loader_version}"
+
+	modImplementation "dev.su5ed.sinytra.fabric-api:fabric-api:${project.fabric_version}"
 }
 
 processResources {
