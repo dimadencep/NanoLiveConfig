@@ -1,5 +1,5 @@
 plugins {
-	id 'dev.architectury.loom' version '1.3-SNAPSHOT'
+	id 'dev.architectury.loom' version '1.4-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -21,9 +21,9 @@ dependencies {
 	// We only depend in loader and therefore mixin, but loom won't make a mod without minecraft and mappings
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	forge "net.neoforged:forge:${project.loader_version}"
+	neoForge "net.neoforged:neoforge:${project.loader_version}"
 
-	modImplementation "dev.su5ed.sinytra.fabric-api:fabric-api:${project.fabric_version}"
+	modImplementation "dev.su5ed.sinytra:fabric-loader:${project.fabric_version}"
 }
 
 processResources {

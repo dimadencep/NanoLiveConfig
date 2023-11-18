@@ -5,7 +5,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModMetadata;
-import net.minecraftforge.fml.loading.LoadingModList;
+import net.neoforged.fml.loading.LoadingModList;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
@@ -199,29 +200,30 @@ public final class CaffeineConfig {
         }
     }
 
-    private static final boolean fabricApiLoaded = LoadingModList.get().getModFileById("fabric_api_base") != null;
-
     private void applyModOverrides(String jsonKey) {
-        forge$applyModOverrides(jsonKey);
-        if(fabricApiLoaded)
-            fabric$applyModOverrides(jsonKey);
-    }
-
-    private void forge$applyModOverrides(String jsonKey) {
         for (var meta : LoadingModList.get().getMods()) {
-            meta.getConfigElement(jsonKey).ifPresent(overridesObj -> {
-                if (overridesObj instanceof Map overrides && overrides.keySet().stream().allMatch(key -> key instanceof String)) {
+            Optional<Map<?, ?>> optionalMap = meta.getConfigElement(jsonKey)
+                    .filter(map -> map instanceof Map<?, ?>)
+                    .map(map -> (Map<?, ?>) map);
+
+            if (optionalMap.isPresent()) {
+                Map<?, ?> overrides = optionalMap.get();
+
+                if (overrides.keySet().parallelStream().allMatch(key -> key instanceof String)) {
                     overrides.forEach((key, value) -> {
-                        this.forge$applyModOverride(meta.getModId(), (String)key, value);
+                        this.applyModOverride(meta.getModId(), (String)key, value);
                     });
                 } else {
                     logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getModId(), modName);
                 }
-            });
+            }
         }
+
+        if (FabricLoaderChecker.hasFabricLoader)
+            fabric$applyModOverrides(jsonKey);
     }
 
-    private void forge$applyModOverride(String modid, String name, Object value) {
+    private void applyModOverride(String modid, String name, Object value) {
         Option option = this.options.get(name);
 
         if (option == null) {
@@ -262,32 +264,39 @@ public final class CaffeineConfig {
                 }
 
                 for (Map.Entry<String, CustomValue> entry : overrides.getAsObject()) {
-                    var name = entry.getKey();
-                    var value = entry.getValue();
-                    Option option = this.options.get(name);
-
-                    if (option == null) {
-                        logger.warn("Mod '{}' attempted to override option '{}', which doesn't exist, ignoring", meta.getId(), name);
-                        return;
-                    }
-
-                    if (value.getType() != CustomValue.CvType.BOOLEAN) {
-                        logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", meta.getId(), name);
-                        return;
-                    }
-
-                    boolean enabled = value.getAsBoolean();
-
-                    // disabling the option takes precedence over enabling
-                    if (!enabled && option.isEnabled()) {
-                        option.clearModsDefiningValue();
-                    }
-
-                    if (!enabled || option.isEnabled() || option.getDefiningMods().isEmpty()) {
-                        option.addModOverride(enabled, meta.getId());
-                    }
+                    this.applyModOverride(meta, entry.getKey(), entry.getValue());
                 }
             }
+        }
+    }
+
+    private void applyModOverride(ModMetadata meta, String name, CustomValue value) {
+        Option option = this.options.get(name);
+
+        if (option == null) {
+            logger.warn("Mod '{}' attempted to override option '{}', which doesn't exist, ignoring", meta.getId(), name);
+            return;
+        }
+
+        if (value.getType() != CustomValue.CvType.BOOLEAN) {
+            logger.warn("Mod '{}' attempted to override option '{}' with an invalid value, ignoring", meta.getId(), name);
+            return;
+        }
+
+        if (!option.isOverrideable()) {
+            logger.warn("Mod '{}' attempted to override option '{}' that is not overrideable, ignoring", meta.getId(), name);
+            return;
+        }
+
+        boolean enabled = value.getAsBoolean();
+
+        // disabling the option takes precedence over enabling
+        if (!enabled && option.isEnabled()) {
+            option.clearModsDefiningValue();
+        }
+
+        if (!enabled || option.isEnabled() || option.getDefiningMods().isEmpty()) {
+            option.addModOverride(enabled, meta.getId());
         }
     }
 
