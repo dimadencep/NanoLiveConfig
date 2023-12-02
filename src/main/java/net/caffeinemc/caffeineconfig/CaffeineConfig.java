@@ -5,7 +5,9 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModMetadata;
+import net.neoforged.fml.loading.EarlyLoadingException;
 import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -15,8 +17,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
@@ -30,6 +32,7 @@ public final class CaffeineConfig {
     private final Map<String, Option> options = new HashMap<>();
     private final Set<Option> optionsWithDependencies = new ObjectLinkedOpenHashSet<>();
     private final String modName;
+    private boolean ignoreErrors;
     private Logger logger;
 
     private CaffeineConfig(String modName) {
@@ -201,22 +204,10 @@ public final class CaffeineConfig {
     }
 
     private void applyModOverrides(String jsonKey) {
-        for (var meta : LoadingModList.get().getMods()) {
-            Optional<Map<?, ?>> optionalMap = meta.getConfigElement(jsonKey)
-                    .filter(map -> map instanceof Map<?, ?>)
-                    .map(map -> (Map<?, ?>) map);
-
-            if (optionalMap.isPresent()) {
-                Map<?, ?> overrides = optionalMap.get();
-
-                if (overrides.keySet().parallelStream().allMatch(key -> key instanceof String)) {
-                    overrides.forEach((key, value) -> {
-                        this.applyModOverride(meta.getModId(), (String)key, value);
-                    });
-                } else {
-                    logger.warn("Mod '{}' contains invalid {} option overrides, ignoring", meta.getModId(), modName);
-                }
-            }
+        for (ModInfo meta : LoadingModList.get().getMods()) {
+            meta.<Map<String, ?>>getConfigElement(jsonKey).ifPresent(overrides ->
+                    overrides.forEach((key, value) -> applyModOverride(meta.getModId(), key, value))
+            );
         }
 
         if (FabricLoaderChecker.hasFabricLoader)
@@ -490,6 +481,15 @@ public final class CaffeineConfig {
         }
 
         /**
+         * <p>Sets whether to ignore fml errors to disable all mixins</p>
+         * @param ignore boolean
+         */
+        public Builder ignoreErrors(boolean ignore) {
+            CaffeineConfig.this.ignoreErrors = ignore;
+            return this;
+        }
+
+        /**
          * <p>Sets the key name to search in other mod's custom values in order to find overrides.</p>
          * @param key The key to search for
          */
@@ -543,6 +543,16 @@ public final class CaffeineConfig {
                     writeDefaultConfig(path, modName, infoUrl);
                 } catch (IOException e) {
                     logger.warn("Could not write default configuration file", e);
+                }
+            }
+
+            if (!ignoreErrors) {
+                List<EarlyLoadingException> errors = LoadingModList.get().getErrors();
+
+                if (!errors.isEmpty()) {
+                    for (Option op : options.values()) {
+                        op.addModOverride(false, errors.get(0).getMessage());
+                    }
                 }
             }
 
