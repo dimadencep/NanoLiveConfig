@@ -32,7 +32,6 @@ public final class CaffeineConfig {
     private final Map<String, Option> options = new HashMap<>();
     private final Set<Option> optionsWithDependencies = new ObjectLinkedOpenHashSet<>();
     private final String modName;
-    private boolean ignoreErrors;
     private Logger logger;
 
     private CaffeineConfig(String modName) {
@@ -54,8 +53,9 @@ public final class CaffeineConfig {
     public static CaffeineConfig.Builder builder(String modName) {
         CaffeineConfig config = new CaffeineConfig(modName);
         config.logger = LogManager.getLogger(modName + " Config");
+        String tomlKey = modName.toLowerCase() + ".mixins";
         String jsonKey = modName.toLowerCase() + ":options";
-        return config.new Builder().withSettingsKey(jsonKey);
+        return config.new Builder().withSettingsKey(tomlKey, jsonKey);
     }
 
     /**
@@ -203,15 +203,21 @@ public final class CaffeineConfig {
         }
     }
 
-    private void applyModOverrides(String jsonKey) {
+    private void applyModOverrides(String tomlKey, String jsonKey) {
         for (ModInfo meta : LoadingModList.get().getMods()) {
-            meta.<Map<String, ?>>getConfigElement(jsonKey).ifPresent(overrides ->
+            meta.<Map<String, ?>>getConfigElement(tomlKey).ifPresent(overrides ->
                     overrides.forEach((key, value) -> applyModOverride(meta.getModId(), key, value))
             );
+
+            meta.<Map<String, ?>>getConfigElement(tomlKey).ifPresent(overrides -> {
+                logger.fatal("Mod '{}' contains old key '{}', please change to '{}'!", meta.getModId(), jsonKey, tomlKey);
+
+                overrides.forEach((key, value) -> applyModOverride(meta.getModId(), key, value));
+            });
         }
 
         if (FabricLoaderChecker.hasFabricLoader)
-            fabric$applyModOverrides(jsonKey);
+            applyModOverrides(jsonKey);
     }
 
     private void applyModOverride(String modid, String name, Object value) {
@@ -242,7 +248,7 @@ public final class CaffeineConfig {
         }
     }
 
-    private void fabric$applyModOverrides(String jsonKey) {
+    private void applyModOverrides(String jsonKey) {
         for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
             ModMetadata meta = container.getMetadata();
 
@@ -402,7 +408,9 @@ public final class CaffeineConfig {
      */
     public final class Builder {
         private boolean alreadyBuilt = false;
+        private boolean ignoreErrors = false;
         private String infoUrl;
+        private String tomlKey;
         private String jsonKey;
 
         private Builder() {}
@@ -485,16 +493,27 @@ public final class CaffeineConfig {
          * @param ignore boolean
          */
         public Builder ignoreErrors(boolean ignore) {
-            CaffeineConfig.this.ignoreErrors = ignore;
+            this.ignoreErrors = ignore;
             return this;
         }
 
         /**
          * <p>Sets the key name to search in other mod's custom values in order to find overrides.</p>
-         * @param key The key to search for
+         * @param tomlKey The key to search for
+         * @param jsonKey The key to search for
          */
-        public Builder withSettingsKey(String key) {
-            this.jsonKey = key;
+        public Builder withSettingsKey(String tomlKey, String jsonKey) {
+            this.tomlKey = tomlKey;
+            this.jsonKey = jsonKey;
+            return this;
+        }
+
+        /**
+         * <p>Sets the key name to search in other mod's custom values in order to find overrides.</p>
+         * @param jsonKey The key to search for
+         */
+        public Builder withSettingsKey(String jsonKey) {
+            this.jsonKey = jsonKey;
             return this;
         }
 
@@ -546,6 +565,8 @@ public final class CaffeineConfig {
                 }
             }
 
+            applyModOverrides(tomlKey, jsonKey);
+
             if (!ignoreErrors) {
                 List<EarlyLoadingException> errors = LoadingModList.get().getErrors();
 
@@ -555,8 +576,6 @@ public final class CaffeineConfig {
                     }
                 }
             }
-
-            applyModOverrides(jsonKey);
 
             // Check dependencies several times, because one iteration may disable a option required by another option
             // This terminates because each additional iteration will disable one or more options, and there is only a finite number of rules
