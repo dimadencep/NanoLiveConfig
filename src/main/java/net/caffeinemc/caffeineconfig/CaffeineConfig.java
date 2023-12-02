@@ -205,15 +205,9 @@ public final class CaffeineConfig {
 
     private void applyModOverrides(String tomlKey, String jsonKey) {
         for (ModInfo meta : LoadingModList.get().getMods()) {
-            meta.<Map<String, ?>>getConfigElement(tomlKey).ifPresent(overrides ->
-                    overrides.forEach((key, value) -> applyModOverride(meta.getModId(), key, value))
-            );
-
-            meta.<Map<String, ?>>getConfigElement(tomlKey).ifPresent(overrides -> {
-                logger.fatal("Mod '{}' contains old key '{}', please change to '{}'!", meta.getModId(), jsonKey, tomlKey);
-
-                overrides.forEach((key, value) -> applyModOverride(meta.getModId(), key, value));
-            });
+            meta.<Map<String, ?>>getConfigElement(jsonKey).ifPresent(overrides -> overrides.forEach(
+                    (key, value) -> applyModOverride(meta.getModId(), key, value)
+            ));
         }
 
         if (FabricLoaderChecker.hasFabricLoader)
