@@ -572,7 +572,7 @@ public final class CaffeineConfig {
 
                 if (!errors.isEmpty()) {
                     for (Option op : options.values()) {
-                        op.addModOverride(false, errors.get(0).getMessage());
+                        op.addModOverride(false, "EarlyLoadingException");
                     }
                 }
             }
