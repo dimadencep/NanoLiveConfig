@@ -17,9 +17,9 @@ repositories {
 }
 
 dependencies {
-	implementation "net.neoforged.fancymodloader:loader:${project.fancy_mod_loader_version}"
-	implementation "org.spongepowered:mixin:0.8.5"
-	implementation "it.unimi.dsi:fastutil:8.5.12"
+	compileOnly "net.neoforged.fancymodloader:loader:${project.fancy_mod_loader_version}"
+	compileOnly "org.spongepowered:mixin:0.8.5"
+	compileOnly "it.unimi.dsi:fastutil:8.5.12"
 
 	compileOnly "dev.su5ed.sinytra:fabric-loader:${project.fabric_version}"
 }

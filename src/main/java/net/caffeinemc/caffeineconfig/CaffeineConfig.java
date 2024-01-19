@@ -5,7 +5,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModMetadata;
-import net.neoforged.fml.loading.EarlyLoadingException;
 import net.neoforged.fml.loading.LoadingModList;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import org.apache.logging.log4j.Logger;
@@ -17,7 +16,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -402,7 +400,6 @@ public final class CaffeineConfig {
      */
     public final class Builder {
         private boolean alreadyBuilt = false;
-        private boolean ignoreErrors = false;
         private String infoUrl;
         private String tomlKey;
         private String jsonKey;
@@ -483,15 +480,6 @@ public final class CaffeineConfig {
         }
 
         /**
-         * <p>Sets whether to ignore fml errors to disable all mixins</p>
-         * @param ignore boolean
-         */
-        public Builder ignoreErrors(boolean ignore) {
-            this.ignoreErrors = ignore;
-            return this;
-        }
-
-        /**
          * <p>Sets the key name to search in other mod's custom values in order to find overrides.</p>
          * @param tomlKey The key to search for
          * @param jsonKey The key to search for
@@ -560,16 +548,6 @@ public final class CaffeineConfig {
             }
 
             applyModOverrides(tomlKey, jsonKey);
-
-            if (!ignoreErrors) {
-                List<EarlyLoadingException> errors = LoadingModList.get().getErrors();
-
-                if (!errors.isEmpty()) {
-                    for (Option op : options.values()) {
-                        op.addModOverride(false, "EarlyLoadingException");
-                    }
-                }
-            }
 
             // Check dependencies several times, because one iteration may disable a option required by another option
             // This terminates because each additional iteration will disable one or more options, and there is only a finite number of rules
