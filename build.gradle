@@ -48,8 +48,8 @@ publishing {
 
 	repositories {
 		maven {
-			name = "ConstructLegacy"
-			url = "https://repo.constructlegacy.ru/public"
+			name = "Redlance"
+			url = "https://repo.redlance.org/public"
 			credentials {
 				username = System.getenv("MAVEN_USERNAME")
 				password = System.getenv("MAVEN_PASSWORD")
