@@ -1,7 +1,7 @@
 package net.caffeinemc.caffeineconfig;
 
 public class FabricLoaderChecker {
-    public static final boolean hasFabricLoader = hasFabricLoader();
+    public static final boolean HAS_FABRIC_LOADER = hasFabricLoader();
 
     private static boolean hasFabricLoader() {
         try {

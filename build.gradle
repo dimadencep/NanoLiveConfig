@@ -3,8 +3,8 @@ plugins {
 	id 'java'
 }
 
-sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_17
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
 
 archivesBaseName = project.archives_base_name
 version = project.mod_version
@@ -18,10 +18,11 @@ repositories {
 
 dependencies {
 	compileOnly "net.neoforged.fancymodloader:loader:${project.fancy_mod_loader_version}"
-	compileOnly "org.spongepowered:mixin:0.8.5"
+
+	compileOnly "net.fabricmc:sponge-mixin:0.14.0+mixin.0.8.6"
 	compileOnly "it.unimi.dsi:fastutil:8.5.12"
 
-	compileOnly "dev.su5ed.sinytra:fabric-loader:${project.fabric_version}"
+	compileOnly "org.sinytra:fabric-loader:${project.fabric_version}"
 }
 
 tasks.withType(JavaCompile).configureEach {

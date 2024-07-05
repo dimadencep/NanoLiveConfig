@@ -208,7 +208,7 @@ public final class CaffeineConfig {
             ));
         }
 
-        if (FabricLoaderChecker.hasFabricLoader)
+        if (FabricLoaderChecker.HAS_FABRIC_LOADER)
             applyModOverrides(jsonKey);
     }
 
