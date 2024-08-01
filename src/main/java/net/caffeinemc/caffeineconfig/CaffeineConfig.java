@@ -199,12 +199,10 @@ public final class CaffeineConfig {
         }
     }
 
-    private static final boolean fabricApiLoaded = LoadingModList.get().getModFileById("fabric_api_base") != null;
-
     private void applyModOverrides(String jsonKey) {
         forge$applyModOverrides(jsonKey);
-        if(fabricApiLoaded)
-            fabric$applyModOverrides(jsonKey);
+
+        if(FabricLoaderChecker.HAS_FABRIC_LOADER) fabric$applyModOverrides(jsonKey);
     }
 
     private void forge$applyModOverrides(String jsonKey) {
